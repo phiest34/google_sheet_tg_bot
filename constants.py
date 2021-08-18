@@ -1,0 +1,8 @@
+BOT_TOKEN = "1986859160:AAH3orsGfaNkicVhUs4oYQqBZD3z-5cPkCw"
+
+DEBUG_KEY = "1AFY3k-jftyOPo6TNGUKhpjGUhl_V0FrZ1uVnwlaGD54"
+LIVE_KEY = "1Jap3p2hXbr1_J6fJtFwRY4-zNUzrUUZXks9PQruJf1o"
+
+debug = True
+
+SHEET_KEY = DEBUG_KEY if debug else LIVE_KEY
