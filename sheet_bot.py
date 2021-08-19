@@ -1,21 +1,24 @@
+import sys
+
 import gspread
 import telebot
-import json
+
+from gspread import Worksheet, Cell
 from telebot import types
+from telebot.types import Message
+
 from constants import *
 from utils import *
 
 
-class Menu_type:
-    CHOOSE_SHEET_MENU = 1
-    CHOOSE_CATEGORY_MENU = 2
-
-
 class Sheet_bot:
-    def __init__(self, token):
+    def __init__(self, token: str):
         self.reply_message_id = 0
         self.tg_bot = telebot.TeleBot(token)
         self.sheet = gspread.service_account().open_by_key(SHEET_KEY)
+        self.context = {WORKSHEET: None,
+                        CATEGORY: None,
+                        CHAT_ID: None}
 
     def start_bot(self):
         self.__register_handlers()
@@ -30,70 +33,94 @@ class Sheet_bot:
         def message_handler(message):
             self.__reply_handler(message)
 
-        @self.tg_bot.message_handler(func=lambda call: True)
-        def test_handler(call):
-            print(call.data)
-
-        @self.tg_bot.callback_query_handler(func=lambda call: Menu_type.CHOOSE_SHEET_MENU in json.loads(call.data))
+        @self.tg_bot.callback_query_handler(func=lambda call: CHOOSE_SHEET_MENU in from_json(call.data))
         def sheet_menu_handler(call):
             self.__sheet_menu_handler(call)
 
-        @self.tg_bot.callback_query_handler(func=lambda call: Menu_type.CHOOSE_CATEGORY_MENU in json.loads(call.data))
+        @self.tg_bot.callback_query_handler(func=lambda call: CHOOSE_CATEGORY_MENU in from_json(call.data))
         def category_menu_handler(call):
             self.__category_menu_handler(call)
 
-    def __send_welcome(self, message):
+    def __send_welcome(self, message: Message):
+        self.context[CHAT_ID] = message.chat.id
         keyboard = types.InlineKeyboardMarkup()
         sheets = self.sheet.worksheets()
         sheet_names = self.__get_sheets_names(sheets)
         buttons = list(
             map(lambda name: types.InlineKeyboardButton(text=name,
-                                                        callback_data=json.dumps({Menu_type.CHOOSE_SHEET_MENU: name})),
+                                                        callback_data=json.dumps(
+                                                            {CHOOSE_SHEET_MENU: name})),
                 sheet_names))
-        buttons.append(types.InlineKeyboardButton(text="Создать новую таблицу",
-                                                  callback_data=json.dumps({Menu_type.CHOOSE_SHEET_MENU: -1})))
+        buttons.append(types.InlineKeyboardButton(text=Strings.CREATE_NEW_TABLE,
+                                                  callback_data=dict_to_json(
+                                                      {CHOOSE_SHEET_MENU: CREATE_NEW_TABLE})
+                                                  ))
         keyboard.add(*buttons)
-        self.tg_bot.send_message(message.chat.id, "Выбери таблицу для редактирования", reply_markup=keyboard)
+        self.tg_bot.send_message(message.chat.id, Strings.SELECT_TABLE, reply_markup=keyboard)
 
     def __sheet_menu_handler(self, call):
-        value = json.loads(call.data)[Menu_type.CHOOSE_SHEET_MENU]
-        if value == -1:
-            self.__show_enter_table_name(call.message.chat.id)
+        value = json.loads(call.data)[CHOOSE_SHEET_MENU]
+
+        if value == CREATE_NEW_TABLE:
+            self.context[WORKSHEET] = SELECTING_TABLE
+            self.__show_enter_table_name()
         else:
             sheet_names = self.__get_sheets_names(self.sheet.worksheets())
             index = index_of(sheet_names, value)
             if index != -1:
-                self.__edit_worksheet(call.message.chat.id, self.sheet.worksheets()[index])
+                cur_sheet = self.sheet.worksheets()[index]
+                self.context[WORKSHEET] = cur_sheet
+                self.context[CATEGORY] = None
+                self.__edit_worksheet(call.message.chat.id, cur_sheet)
 
     def __category_menu_handler(self, call):
-        value = json.loads(call.data)[Menu_type.CHOOSE_CATEGORY_MENU]
-        print(value)
+        coordinates = from_json(call.data)[CHOOSE_CATEGORY_MENU]
+        cell = self.context[CATEGORY] = self.context[WORKSHEET].cell(coordinates[0] + 1, coordinates[1] + 1)
+        chat_id = self.context[CHAT_ID]
+        markup = types.ForceReply(selective=False)
+        if cell is not None:
+            fields = self.__get_fields()
+            enter_message = Strings.ENTER_FIELDS
+            for field in fields:
+                enter_message += str(field) + ' '
+            self.tg_bot.send_message(chat_id, enter_message, reply_markup=markup)
 
     def __reply_handler(self, message):
-        if message.reply_to_message.id == self.__get_message_id():
+        if message.reply_to_message.id == self.reply_message_id:
             self.sheet.add_worksheet(title=message.text, rows=0, cols=0)
 
-    def __show_enter_table_name(self, chat_id):
+    def __show_enter_table_name(self):
         markup = types.ForceReply(selective=False)
-        msg = self.tg_bot.send_message(chat_id, "Введите название таблицы", reply_markup=markup)
-        self.__save_message_id(msg.id)
+        chat_id = self.context[CHAT_ID]
+        msg = self.tg_bot.send_message(chat_id, Strings.CREATE_NEW_TABLE, reply_markup=markup)
+        self.reply_message_id = msg.id
 
-    def __save_message_id(self, message_id):
-        self.reply_message_id = message_id
-
-    def __get_message_id(self):
-        return self.reply_message_id
-
-    def __edit_worksheet(self, chat_id, sheet):
+    def __edit_worksheet(self, chat_id: int, sheet: Worksheet):
         keyboard = types.InlineKeyboardMarkup()
-        menu_string = starts_with_hash(sheet.get_all_values())
+        sheet_data = starts_with_hash(sheet.get_all_values())
         buttons = []
-        for item in menu_string:
-            buttons.append(types.InlineKeyboardButton(
-                text=item, callback_data=json.dumps({Menu_type.CHOOSE_CATEGORY_MENU, item}))
-            )
-        keyboard.add(*buttons)
-        self.tg_bot.send_message(chat_id, "Выбери категорию", reply_markup=keyboard)
+        for item in sheet_data:
+            callback_data = dict_to_json({CHOOSE_CATEGORY_MENU: item})
+            cell = sheet.cell((item[0] + 1), (item[1] + 1))
+            text = cell.value
+            buttons.append(types.InlineKeyboardButton(text=text, callback_data=callback_data))
 
-    def __get_sheets_names(self, sheets):
+        keyboard.add(*buttons)
+        self.tg_bot.send_message(chat_id, Strings.SELECT_CATEGORY, reply_markup=keyboard)
+
+    def __get_sheets_names(self, sheets: [Worksheet]):
         return list(map(lambda sheet: sheet.title, sheets))
+
+    def __get_fields(self):
+        sheet = self.context[WORKSHEET]
+        cell = self.context[CATEGORY]
+        values = sheet.row_values(cell.row)
+        index = values.index(cell.value)
+        sliced = values[index + 1:]
+        fields = [values[index]]
+        for item in sliced:
+            if item == '' or item.startswith('#'):
+                break
+            else:
+                fields.append(item)
+        return fields
