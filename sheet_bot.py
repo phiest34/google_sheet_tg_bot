@@ -27,6 +27,10 @@ class Sheet_bot:
         self.tg_bot.polling(none_stop=True)
 
     def __register_handlers(self):
+        @self.tg_bot.message_handler(commands=['info'])
+        def send_info(message):
+            self.__send_info(message)
+
         @self.tg_bot.message_handler(commands=['start'])
         def send_welcome(message):
             self.__send_welcome(message)
@@ -42,6 +46,9 @@ class Sheet_bot:
         @self.tg_bot.callback_query_handler(func=lambda call: CHOOSE_CATEGORY_MENU in from_json(call.data))
         def category_menu_handler(call):
             self.__category_menu_handler(call)
+
+    def __send_info(self, message: Message):
+        self.tg_bot.send_message(message.chat.id, Strings.CONNECT_TO_DEV)
 
     def __send_welcome(self, message: Message):
         self.context[CHAT_ID] = message.chat.id
@@ -92,10 +99,11 @@ class Sheet_bot:
         self.enter_values_reply_message_id = msg.id
 
     def __reply_handler(self, message):
-        if message.reply_to_message.id == self.add_worksheet_reply_message_id:
-            self.sheet.add_worksheet(title=message.text, rows=0, cols=0)
-        if message.reply_to_message.id == self.enter_values_reply_message_id:
-            self.__handle_values_message(message.text)
+        if message.reply_to_message is not None:
+            if message.reply_to_message.id == self.add_worksheet_reply_message_id:
+                self.sheet.add_worksheet(title=message.text, rows=0, cols=0)
+            if message.reply_to_message.id == self.enter_values_reply_message_id:
+                self.__handle_values_message(message.text)
 
     def __show_enter_table_name(self):
         markup = types.ForceReply(selective=False)

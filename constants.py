@@ -12,6 +12,7 @@ SHEET_KEY = DEBUG_KEY if debug else LIVE_KEY
 
 # strings:
 class Strings:
+    CONNECT_TO_DEV = "Если вы нашли баг или есть проблемы в работе бота,пишите в телеграм: @phiest34"
     SELECT_TABLE = "Выбери таблицу для редактирования"
     CREATE_NEW_TABLE = "Создать новую таблицу"
     ENTER_TABLE_NAME = "Введите название таблицы"
