@@ -16,7 +16,8 @@ class Strings:
     CREATE_NEW_TABLE = "Создать новую таблицу"
     ENTER_TABLE_NAME = "Введите название таблицы"
     SELECT_CATEGORY = "Выбери категорию"
-    ENTER_FIELDS = "Введите "
+    ENTER_FIELDS = "Введите: "
+    ENTER_FIELDS_COUNT_EXCEPTION = "Вы ввели неверное количество данных, Введите: "
 
 
 # menu
@@ -33,6 +34,7 @@ __context_keys = Context_keys()
 WORKSHEET = __context_keys.WORKSHEET
 CATEGORY = __context_keys.CATEGORY
 CHAT_ID = __context_keys.CHAT_ID
+FIELDS_COUNT = __context_keys.FIELDS_COUNT
 
 # states
 states = States()

@@ -13,12 +13,14 @@ from utils import *
 
 class Sheet_bot:
     def __init__(self, token: str):
-        self.reply_message_id = 0
+        self.add_worksheet_reply_message_id = 0
+        self.enter_values_reply_message_id = 0
         self.tg_bot = telebot.TeleBot(token)
         self.sheet = gspread.service_account().open_by_key(SHEET_KEY)
         self.context = {WORKSHEET: None,
                         CATEGORY: None,
-                        CHAT_ID: None}
+                        CHAT_ID: None,
+                        FIELDS_COUNT: None}
 
     def start_bot(self):
         self.__register_handlers()
@@ -76,24 +78,30 @@ class Sheet_bot:
     def __category_menu_handler(self, call):
         coordinates = from_json(call.data)[CHOOSE_CATEGORY_MENU]
         cell = self.context[CATEGORY] = self.context[WORKSHEET].cell(coordinates[0] + 1, coordinates[1] + 1)
+        if cell is not None:
+            self.__send_enter_fields_values_message(Strings.ENTER_FIELDS)
+
+    def __send_enter_fields_values_message(self, text):
         chat_id = self.context[CHAT_ID]
         markup = types.ForceReply(selective=False)
-        if cell is not None:
-            fields = self.__get_fields()
-            enter_message = Strings.ENTER_FIELDS
-            for field in fields:
-                enter_message += str(field) + ' '
-            self.tg_bot.send_message(chat_id, enter_message, reply_markup=markup)
+        fields = self.__get_fields()
+        enter_message = text
+        for field in fields:
+            enter_message += str(field) + ' '
+        msg = self.tg_bot.send_message(chat_id, enter_message, reply_markup=markup)
+        self.enter_values_reply_message_id = msg.id
 
     def __reply_handler(self, message):
-        if message.reply_to_message.id == self.reply_message_id:
+        if message.reply_to_message.id == self.add_worksheet_reply_message_id:
             self.sheet.add_worksheet(title=message.text, rows=0, cols=0)
+        if message.reply_to_message.id == self.enter_values_reply_message_id:
+            self.__handle_values_message(message.text)
 
     def __show_enter_table_name(self):
         markup = types.ForceReply(selective=False)
         chat_id = self.context[CHAT_ID]
         msg = self.tg_bot.send_message(chat_id, Strings.CREATE_NEW_TABLE, reply_markup=markup)
-        self.reply_message_id = msg.id
+        self.add_worksheet_reply_message_id = msg.id
 
     def __edit_worksheet(self, chat_id: int, sheet: Worksheet):
         keyboard = types.InlineKeyboardMarkup()
@@ -123,4 +131,20 @@ class Sheet_bot:
                 break
             else:
                 fields.append(item)
+        self.context[FIELDS_COUNT] = len(fields)
         return fields
+
+    def __handle_values_message(self, text):
+        values = text.split()
+        fields_count = self.context[FIELDS_COUNT]
+        if fields_count != len(values):
+            self.__send_enter_fields_values_message(Strings.ENTER_FIELDS_COUNT_EXCEPTION)
+            return
+        coordinates = self.context[CATEGORY].row, self.context[CATEGORY].col
+        dx = 0
+        while True:
+            if not self.context[WORKSHEET].cell(coordinates[0] + dx, coordinates[1]).value:
+                break
+            dx += 1
+        for dy in range(len(values)):
+            self.context[WORKSHEET].update_cell(coordinates[0] + dx, coordinates[1] + dy, values[dy])
