@@ -9,6 +9,7 @@ from telebot.types import Message
 
 from constants import *
 from utils import *
+from string_int_converter import String_int_converter
 
 
 class Sheet_bot:
@@ -17,6 +18,7 @@ class Sheet_bot:
         self.enter_values_reply_message_id = 0
         self.tg_bot = telebot.TeleBot(token)
         self.sheet = gspread.service_account().open_by_key(SHEET_KEY)
+        self.converter = String_int_converter()
         self.context = {WORKSHEET: None,
                         CATEGORY: None,
                         CHAT_ID: None,
@@ -55,11 +57,11 @@ class Sheet_bot:
         keyboard = types.InlineKeyboardMarkup(row_width=1)
         sheets = self.sheet.worksheets()
         sheet_names = self.__get_sheets_names(sheets)
-        buttons = list(
-            map(lambda name: types.InlineKeyboardButton(text=name,
-                                                        callback_data=json.dumps(
-                                                            {CHOOSE_SHEET_MENU: name})),
-                sheet_names))
+        buttons = []
+        for name in sheet_names:
+            self.converter.set_string(name)
+            buttons.append(types.InlineKeyboardButton(text=name, callback_data=dict_to_json(
+                {CHOOSE_SHEET_MENU: self.converter.get_int(name)})))
         buttons.append(types.InlineKeyboardButton(text=Strings.CREATE_NEW_TABLE,
                                                   callback_data=dict_to_json(
                                                       {CHOOSE_SHEET_MENU: CREATE_NEW_TABLE})
@@ -69,13 +71,13 @@ class Sheet_bot:
 
     def __sheet_menu_handler(self, call):
         value = json.loads(call.data)[CHOOSE_SHEET_MENU]
-
         if value == CREATE_NEW_TABLE:
             self.context[WORKSHEET] = SELECTING_TABLE
             self.__show_enter_table_name()
         else:
+            string_value = self.converter.get_string(int(value))
             sheet_names = self.__get_sheets_names(self.sheet.worksheets())
-            index = index_of(sheet_names, value)
+            index = index_of(sheet_names, string_value)
             if index != -1:
                 cur_sheet = self.sheet.worksheets()[index]
                 self.context[WORKSHEET] = cur_sheet
