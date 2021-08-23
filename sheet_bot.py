@@ -52,7 +52,7 @@ class Sheet_bot:
 
     def __send_welcome(self, message: Message):
         self.context[CHAT_ID] = message.chat.id
-        keyboard = types.InlineKeyboardMarkup()
+        keyboard = types.InlineKeyboardMarkup(row_width=1)
         sheets = self.sheet.worksheets()
         sheet_names = self.__get_sheets_names(sheets)
         buttons = list(
@@ -79,6 +79,8 @@ class Sheet_bot:
             if index != -1:
                 cur_sheet = self.sheet.worksheets()[index]
                 self.context[WORKSHEET] = cur_sheet
+                text = Strings.CURRENT_SHEET + cur_sheet.title
+                self.tg_bot.send_message(self.context[CHAT_ID], text)
                 self.context[CATEGORY] = None
                 self.__edit_worksheet(call.message.chat.id, cur_sheet)
 
@@ -86,6 +88,8 @@ class Sheet_bot:
         coordinates = from_json(call.data)[CHOOSE_CATEGORY_MENU]
         cell = self.context[CATEGORY] = self.context[WORKSHEET].cell(coordinates[0] + 1, coordinates[1] + 1)
         if cell is not None:
+            text = Strings.CURRENT_CATEGORY + cell.value
+            self.tg_bot.send_message(self.context[CHAT_ID], text)
             self.__send_enter_fields_values_message(Strings.ENTER_FIELDS)
 
     def __send_enter_fields_values_message(self, text):
@@ -120,9 +124,11 @@ class Sheet_bot:
             cell = sheet.cell((item[0] + 1), (item[1] + 1))
             text = cell.value
             buttons.append(types.InlineKeyboardButton(text=text, callback_data=callback_data))
-
         keyboard.add(*buttons)
-        self.tg_bot.send_message(chat_id, Strings.SELECT_CATEGORY, reply_markup=keyboard)
+        if buttons:
+            self.tg_bot.send_message(chat_id, Strings.SELECT_CATEGORY, reply_markup=keyboard)
+        else:
+            self.tg_bot.send_message(chat_id, Strings.CATEGORY_EMPTY_EXCEPTION)
 
     def __get_sheets_names(self, sheets: [Worksheet]):
         return list(map(lambda sheet: sheet.title, sheets))

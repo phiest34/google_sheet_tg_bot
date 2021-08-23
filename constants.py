@@ -17,6 +17,9 @@ class Strings:
     CREATE_NEW_TABLE = "Создать новую таблицу"
     ENTER_TABLE_NAME = "Введите название таблицы"
     SELECT_CATEGORY = "Выбери категорию"
+    CURRENT_SHEET = "Выбранная таблица: "
+    CURRENT_CATEGORY = "Выбранная категория: "
+    CATEGORY_EMPTY_EXCEPTION = "Выбранная таблица не имеет полей для редактирования."
     ENTER_FIELDS = "Введите: "
     ENTER_FIELDS_COUNT_EXCEPTION = "Вы ввели неверное количество данных, Введите: "
 
