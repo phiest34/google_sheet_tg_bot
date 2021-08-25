@@ -3,7 +3,7 @@ class String_int_converter:
         self.data = {}
 
     def set_string(self, string):
-        self.data[string] = self.__generate_int()
+        self.data[string] = self.__generate_int(string)
 
     def get_int(self, string):
         value = self.data[string]
@@ -15,5 +15,5 @@ class String_int_converter:
                 return key
         return ''
 
-    def __generate_int(self):
-        return len(self.data)
+    def __generate_int(self, string):
+        return hash(string)
